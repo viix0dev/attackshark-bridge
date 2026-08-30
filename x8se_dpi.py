@@ -86,7 +86,25 @@ def candidate_paths(pid_arg):
     return out
 
 
-def open_working_device(pid_arg, path_arg):
+def probe_report_ids(path, id_range=range(0, 32)):
+    """Read-only diagnostic: try GET_FEATURE across a range of report IDs
+    on a given path, to see what's actually declared there. Safe — never
+    sends anything."""
+    results = []
+    for rid in id_range:
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+            data = dev.get_feature_report(rid, 64)
+            results.append((rid, bytes(data)))
+        except OSError:
+            pass
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+    return results
     """Open a device handle that actually responds to GET_FEATURE for our
     profile report, probing every candidate collection path if needed."""
     if path_arg:
@@ -189,6 +207,10 @@ def main():
                           f"in order: {', '.join(f'{p:#06x}' for p in KNOWN_PIDS)}")
     ap.add_argument("--path", help="Exact hidapi device path (bypasses auto-detect)")
     ap.add_argument("--list", action="store_true", help="List matching HID interfaces and exit")
+    ap.add_argument("--probe-reports", action="store_true",
+                     help="Diagnostic: read-only scan of report IDs 0-31 across "
+                          "every candidate collection, to see what's actually "
+                          "there. Never sends anything. Use this when --get fails.")
     ap.add_argument("--get", action="store_true", help="Read and print the current profile")
     ap.add_argument("--set-stage", nargs=2, metavar=("STAGE", "DPI"),
                      help="Set one stage's DPI, e.g. --set-stage 2 1600")
@@ -212,6 +234,20 @@ def main():
             print(f"  PID={d['product_id']:#06x} iface={d.get('interface_number')} "
                   f"usage_page={d.get('usage_page')} usage={d.get('usage')} "
                   f"path={d['path']}")
+        return
+
+    if args.probe_reports:
+        candidates = candidate_paths(args.pid)
+        if not candidates:
+            print("No candidate collections found — check --list output.")
+            return
+        for pid, path in candidates:
+            print(f"\n--- Probing PID={pid:#06x} path={path} ---")
+            hits = probe_report_ids(path)
+            if not hits:
+                print("  (no report IDs 0-31 responded on this collection)")
+            for rid, data in hits:
+                print(f"  report 0x{rid:02x}: {data.hex()}")
         return
 
     if not (args.get or args.set_stage or args.set_active_stage is not None
