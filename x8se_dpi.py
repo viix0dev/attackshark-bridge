@@ -38,6 +38,7 @@ Usage:
 
 import argparse
 import sys
+import time
 
 try:
     import hid
@@ -95,6 +96,7 @@ def probe_report_ids(path, id_range=range(0, 32)):
         dev = hid.device()
         try:
             dev.open_path(path)
+            time.sleep(0.05)
             data = dev.get_feature_report(rid, 64)
             results.append((rid, bytes(data)))
         except OSError:
@@ -127,6 +129,7 @@ def open_working_device(pid_arg, path_arg):
         dev = hid.device()
         try:
             dev.open_path(path)
+            time.sleep(0.1)
             dev.get_feature_report(REPORT_ID_PROFILE, PROFILE_LEN)
         except OSError as e:
             last_err = e
@@ -168,8 +171,12 @@ def checksum(buf):
 
 
 def read_profile(dev):
-    # hidapi's get_feature_report needs the report id as the first byte
-    # of the buffer you pass in, and returns it prefixed in the result too.
+    # The X8 SE's config MCU appears to need a short pause between HID
+    # transactions — sending GET_FEATURE back-to-back with no delay
+    # reliably fails on the second call in testing. hidapi's
+    # get_feature_report needs the report id as the first byte of the
+    # buffer you pass in, and returns it prefixed in the result too.
+    time.sleep(0.15)
     raw = dev.get_feature_report(REPORT_ID_PROFILE, PROFILE_LEN)
     return bytearray(raw)
 
@@ -198,6 +205,7 @@ def write_profile(dev, buf, dry_run):
         print("(--dry-run: not actually sending. Compare this hex against "
               "a real Wireshark capture of the same change before trusting it.)")
         return
+    time.sleep(0.15)
     dev.send_feature_report(bytes(buf))
     print("Sent.")
 
@@ -287,6 +295,7 @@ def main():
             if args.dry_run:
                 print("(--dry-run: not actually sending.)")
             else:
+                time.sleep(0.15)
                 dev.send_feature_report(bytes(buf))
                 print("Sent.")
 
