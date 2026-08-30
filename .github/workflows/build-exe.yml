@@ -32,7 +32,7 @@ jobs:
         pyinstaller --onefile --console x8se_dpi.py
 
     - name: Upload Executable Artifact
-      uses: actions/actions-artifact@v4
+      uses: actions/upload-artifact@v4
       with:
         name: x8se_dpi-windows-exe
         path: dist/x8se_dpi.exe
