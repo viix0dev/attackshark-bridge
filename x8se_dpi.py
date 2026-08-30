@@ -72,25 +72,58 @@ def find_device_path(pid):
     return matches
 
 
-def open_device(pid, path=None):
-    dev = hid.device()
-    if path:
-        dev.open_path(path)
+def candidate_paths(pid_arg):
+    """All HID paths worth trying: either just the given PID, or every
+    known PID, restricted to interface 2 (the config interface). Windows
+    splits one USB interface into several paths (one per Top-Level
+    Collection), and only one of them actually declares our Feature
+    Report ID — so we can't just pick the first match blindly."""
+    pids = [pid_arg] if pid_arg else KNOWN_PIDS
+    out = []
+    for pid in pids:
+        for path_info in find_device_path(pid):
+            out.append((pid, path_info["path"]))
+    return out
+
+
+def open_working_device(pid_arg, path_arg):
+    """Open a device handle that actually responds to GET_FEATURE for our
+    profile report, probing every candidate collection path if needed."""
+    if path_arg:
+        dev = hid.device()
+        dev.open_path(path_arg)
         return dev
 
-    pids_to_try = [pid] if pid else KNOWN_PIDS
-    for candidate_pid in pids_to_try:
-        matches = find_device_path(candidate_pid)
-        if matches:
-            print(f"Found device at PID={candidate_pid:#06x}, opening "
-                  f"{matches[0]['path']}")
-            dev.open_path(matches[0]["path"])
-            return dev
+    candidates = candidate_paths(pid_arg)
+    if not candidates:
+        tried = ", ".join(f"{p:#06x}" for p in ([pid_arg] if pid_arg else KNOWN_PIDS))
+        print(f"No HID device found for VID={VID:#06x}, tried PID(s): {tried}. "
+              f"Try --list to see what's actually connected.")
+        sys.exit(1)
 
-    tried = ", ".join(f"{p:#06x}" for p in pids_to_try)
-    print(f"No HID device found for VID={VID:#06x}, tried PID(s): {tried}. "
-          f"Try --list to see what's actually connected, then --pid to "
-          f"target it explicitly.")
+    last_err = None
+    for pid, path in candidates:
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+            dev.get_feature_report(REPORT_ID_PROFILE, PROFILE_LEN)
+        except OSError as e:
+            last_err = e
+            try:
+                dev.close()
+            except Exception:
+                pass
+            continue
+        print(f"Working collection found: PID={pid:#06x} path={path}")
+        return dev
+
+    print("None of the candidate HID collections responded to "
+          f"GET_FEATURE for report {REPORT_ID_PROFILE:#04x}.")
+    print(f"Last error: {last_err}")
+    print("Run --list to see all candidates for this VID, then pass the "
+          "right one explicitly with --path '<path>'.")
+    print("(Also make sure the official Attack Shark software / Wireshark "
+          "isn't holding the device open elsewhere.)")
     sys.exit(1)
 
 
@@ -186,7 +219,7 @@ def main():
         ap.print_help()
         return
 
-    dev = open_device(args.pid, args.path)
+    dev = open_working_device(args.pid, args.path)
     try:
         if args.restore_hex:
             hex_str = args.restore_hex.replace(" ", "").replace(":", "")
