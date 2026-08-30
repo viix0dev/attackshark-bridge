@@ -105,6 +105,9 @@ def probe_report_ids(path, id_range=range(0, 32)):
             except Exception:
                 pass
     return results
+
+
+def open_working_device(pid_arg, path_arg):
     """Open a device handle that actually responds to GET_FEATURE for our
     profile report, probing every candidate collection path if needed."""
     if path_arg:
