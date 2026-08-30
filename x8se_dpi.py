@@ -47,7 +47,8 @@ except ImportError:
 
 
 VID = 0x1D57
-PID_DEFAULT = 0x2120  # X8 SE dongle, from your capture's device descriptor
+PID_DEFAULT = 0x2120  # X8 SE via 2.4GHz wireless dongle, from your original capture
+KNOWN_PIDS = [0x2120, 0xFA60, 0xFA55]  # wireless dongle, X11-shared wired PIDs
 INTERFACE_NUMBER = 2  # "Interface 2: Generic HID" — the config interface
 REPORT_ID_PROFILE = 0x04
 PROFILE_LEN = 52  # matches your capture (wired-mode-length buffer)
@@ -75,14 +76,22 @@ def open_device(pid, path=None):
     dev = hid.device()
     if path:
         dev.open_path(path)
-    else:
-        matches = find_device_path(pid)
-        if not matches:
-            print(f"No HID device found for VID={VID:#06x} PID={pid:#06x}. "
-                  f"Try --list to see what's connected.")
-            sys.exit(1)
-        dev.open_path(matches[0]["path"])
-    return dev
+        return dev
+
+    pids_to_try = [pid] if pid else KNOWN_PIDS
+    for candidate_pid in pids_to_try:
+        matches = find_device_path(candidate_pid)
+        if matches:
+            print(f"Found device at PID={candidate_pid:#06x}, opening "
+                  f"{matches[0]['path']}")
+            dev.open_path(matches[0]["path"])
+            return dev
+
+    tried = ", ".join(f"{p:#06x}" for p in pids_to_try)
+    print(f"No HID device found for VID={VID:#06x}, tried PID(s): {tried}. "
+          f"Try --list to see what's actually connected, then --pid to "
+          f"target it explicitly.")
+    sys.exit(1)
 
 
 def encode_dpi(dpi):
@@ -142,8 +151,9 @@ def write_profile(dev, buf, dry_run):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--pid", type=lambda x: int(x, 0), default=PID_DEFAULT,
-                     help=f"USB PID override (default {PID_DEFAULT:#06x} for the dongle)")
+    ap.add_argument("--pid", type=lambda x: int(x, 0), default=None,
+                     help=f"USB PID override. If omitted, tries known PIDs "
+                          f"in order: {', '.join(f'{p:#06x}' for p in KNOWN_PIDS)}")
     ap.add_argument("--path", help="Exact hidapi device path (bypasses auto-detect)")
     ap.add_argument("--list", action="store_true", help="List matching HID interfaces and exit")
     ap.add_argument("--get", action="store_true", help="Read and print the current profile")
