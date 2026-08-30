@@ -2,12 +2,13 @@ name: Build and Release Executable
 
 on:
   push:
+    branches: [ "main", "master" ]
     tags:
-      - 'v*.*.*'  # Triggers on tags like v1.0.0, v2.1.0
-  workflow_dispatch: # Keeps manual trigger available in Actions tab
+      - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
-  contents: write # Grants permissions to create releases and upload assets
+  contents: write
 
 jobs:
   build:
@@ -36,5 +37,7 @@ jobs:
     - name: Publish to GitHub Releases
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}
+        name: ${{ github.ref_type == 'tag' && github.ref_name || 'Latest Build' }}
         files: dist/x8se_dpi.exe
         generate_release_notes: true
