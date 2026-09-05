@@ -3,3 +3,6 @@ Attack Shark X8SE HID-DPI Protocol Research — Summary.md
 PYTHON_TO_EXE.md
 # Python to EXE
 /output/
+__pycache__
+# Tests & Captures
+/captures/
