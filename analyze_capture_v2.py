@@ -234,6 +234,58 @@ def build_hid_transactions(parsed, t0):
 # Reporting
 # ---------------------------------------------------------------------------
 
+def diagnose_no_transactions(parsed):
+    """Explain an empty result instead of just reporting zero.
+
+    The usual cause is capturing the wrong USBPcap root hub: the capture is
+    full of traffic, just not the mouse's. The second cause is a real one —
+    changing DPI with the button on the mouse produces no host-to-device
+    traffic at all, because the mouse switches stage internally.
+    """
+    lines = []
+    lines.append("No HID control transactions were reconstructed.")
+    lines.append("")
+
+    by_transfer = {}
+    by_device = {}
+    for h in parsed:
+        by_transfer[h["transfer"]] = by_transfer.get(h["transfer"], 0) + 1
+        key = (h["device"], h["endpoint"], h["direction_in"], h["transfer"])
+        by_device[key] = by_device.get(key, 0) + 1
+
+    lines.append(f"What the capture DOES contain ({len(parsed)} USB packets):")
+    for kind, count in sorted(by_transfer.items(), key=lambda kv: -kv[1]):
+        lines.append(f"  {kind:<10} {count}")
+    lines.append("")
+    lines.append("Per device/endpoint:")
+    for (dev, ep, is_in, kind), count in sorted(by_device.items(),
+                                                key=lambda kv: -kv[1])[:15]:
+        lines.append(f"  device {dev:<3} endpoint 0x{ep:02x} "
+                     f"{'IN ' if is_in else 'OUT'} {kind:<10} {count}")
+    lines.append("")
+
+    if by_transfer.get("CONTROL", 0) == 0:
+        lines.append("There are ZERO control transfers here, so no SET_REPORT/")
+        lines.append("GET_REPORT could exist. The two things that cause this:")
+        lines.append("")
+        lines.append("  1. Wrong USBPcap interface. Each USBPcapN is one root")
+        lines.append("     hub. If the mouse is on a different hub you capture")
+        lines.append("     everything except the mouse. In Wireshark, expand")
+        lines.append("     each USBPcapN and pick the one that actually lists")
+        lines.append("     the mouse, then set that number in the recorder.")
+        lines.append("")
+        lines.append("  2. You changed DPI with the button on the mouse. That")
+        lines.append("     is handled inside the mouse and puts nothing on the")
+        lines.append("     bus. To capture the protocol you must change the")
+        lines.append("     setting in the vendor software.")
+    else:
+        lines.append("There are control transfers, but none matched a HID")
+        lines.append("GET_REPORT/SET_REPORT. The device may use a vendor")
+        lines.append("request type, or the config traffic may run over an")
+        lines.append("interrupt endpoint instead.")
+    return lines
+
+
 def fmt_txn(t):
     return (f"pkt={t['num']:6d} t={t['t']:9.3f}s {t['direction']:3s} "
             f"{t['request']:11s} reportType={t['reportType']} "
@@ -319,6 +371,12 @@ def main():
     print(f"Loaded {len(packets)} packets, {len(transactions)} HID "
           f"GET/SET_REPORT transactions.")
     print(f"Capture span: {(parsed[-1]['ts'] - t0) / 1e6:.3f}s")
+
+    if not transactions:
+        print()
+        for line in diagnose_no_transactions(parsed):
+            print(line)
+        return
 
     print_full_timeline(transactions)
 

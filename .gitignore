@@ -6,3 +6,5 @@ PYTHON_TO_EXE.md
 __pycache__
 # Tests & Captures
 /captures/
+# C code for some analysis
+reverse.c
