@@ -69,3 +69,14 @@ python x8se/test_protocol.py
 
 Its main test regenerates, byte for byte, the packet the vendor software sent to
 change DPI — starting from the profile the mouse reported.
+
+### Got an X8SE? Help test
+
+The protocol is decoded but has **not yet been run against real hardware**. If
+you own one, **[x8se/TESTING.md](x8se/TESTING.md)** is a step-by-step guide —
+read-only checks first, then writes, then captures. Every step says what to send
+back.
+
+The most useful things right now: does the DPI button emit an event (`--watch`),
+and a capture of a **polling rate** change, which is the one setting still
+carried over unverified from the X11.
