@@ -19,7 +19,7 @@ This repository includes:
 
 | Model | Connection | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **AttackShark X11** | Wired / 2.4G / BT | 🟢 Partily Supported | https://github.com/viix0dev/OpenMouse-Bridge |
+| **AttackShark X11** | Wired / 2.4G / BT | 🟢 Partily Supported | [Driver Only](x11/OpenMouse-AttackShark-X11.inf) or [viix0dev/OpenMouse-Bridge (Implementation)](https://github.com/viix0dev/OpenMouse-Bridge/tree/attackshark-x11-driver) |
 | **AttackShark X8se** | Wired / 2.4G | 🟢 Protocol mapped | DPI + active stage verified — see [x8se/PROTOCOL.md](x8se/PROTOCOL.md) |
 | **AttackShark X3** | Wired / 2.4G / BT | 🔴 Planned | Captures needed |
 
